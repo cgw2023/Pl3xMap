@@ -30,6 +30,7 @@ import de.bluecolored.bluenbt.TypeToken;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -85,20 +86,20 @@ public class ChunkLoader {
         if (compression == null)
             throw new IOException("Unknown chunk compression-id: " + compressionTypeId);
 
-        InputStream decompressedIn = new BufferedInputStream(compression.decompress(new FileInputStream(raf.getFD())));
-
         // retry-supplier re-seeks the RandomAccessFile and re-decompresses from
         // scratch - this is exactly what the old inline code did on a loader mismatch.
         Supplier<InputStream> retrySupplier = () -> {
             try {
                 raf.seek(offset + 5);
-                return new BufferedInputStream(compression.decompress(new FileInputStream(raf.getFD())));
+                return new BufferedInputStream(compression.decompress(nonClosing(new FileInputStream(raf.getFD()))));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         };
 
-        return loadNbt(decompressedIn, retrySupplier, index);
+        try (InputStream decompressedIn = new BufferedInputStream(compression.decompress(nonClosing(new FileInputStream(raf.getFD()))))) {
+            return loadNbt(decompressedIn, retrySupplier, index);
+        }
     }
 
     /**
@@ -125,8 +126,9 @@ public class ChunkLoader {
         // check version and reload chunk if the wrong loader has been used and a better one has been found
         ChunkVersionLoader<?> actualLoader = findBestLoaderForVersion(chunk.getDataVersion());
         if (actualLoader != null && usedLoader != actualLoader) {
-            InputStream retryIn = retrySupplier.get();
-            chunk = actualLoader.load(world, region, retryIn, index);
+            try (InputStream retryIn = retrySupplier.get()) {
+                chunk = actualLoader.load(world, region, retryIn, index);
+            }
             lastUsedLoader = actualLoader;
         }
 
@@ -138,6 +140,13 @@ public class ChunkLoader {
             if (loader.mightSupport(version)) return loader;
         }
         return null;
+    }
+
+    private static InputStream nonClosing(InputStream in) {
+        return new FilterInputStream(in) {
+            @Override
+            public void close() {}
+        };
     }
 
     private static class ChunkVersionLoader<D extends Chunk.Data> {
