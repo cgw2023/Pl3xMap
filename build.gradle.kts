@@ -1,6 +1,14 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
     id("java-library")
     alias(libs.plugins.minotaur)
+}
+
+subprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        options.release.set(25)
+    }
 }
 
 val buildNum = System.getenv("NEXT_BUILD_NUMBER") ?: "SNAPSHOT"
