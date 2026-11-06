@@ -125,9 +125,11 @@ public abstract class World extends Keyed {
         this.biomeRegistry = new BiomeRegistry();
         this.layerRegistry = new Registry<>();
 
+        // each cached Region can hold up to 1024 parsed chunks (~100-250MB), so
+        // keep this small; needed regions are re-loaded from disk when evicted
         this.regionCache = Caffeine.newBuilder()
                 .expireAfterWrite(1, TimeUnit.MINUTES)
-                .maximumSize(100)
+                .maximumSize(16)
                 .build(this::loadRegion);
 
         this.regionModifiedState = new RegionModifiedState(this);

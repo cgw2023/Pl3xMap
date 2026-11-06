@@ -29,6 +29,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Objects;
 import net.pl3x.map.core.Pl3xMap;
 import net.pl3x.map.core.log.Logger;
@@ -138,6 +139,17 @@ public class Region {
 
         if (size <= 0) return this.chunks[index] = new EmptyChunk(world, this, index);
         return this.chunks[index] = chunkLoader.load(raf, offset, index);
+    }
+
+    /**
+     * Frees all parsed chunks held by this region, so a completed region
+     * scan does not keep ~1024 parsed chunks (sections, packed arrays, block
+     * data, light arrays) alive for the rest of the region cache lifetime.
+     * Cleared chunks are re-loaded lazily by {@link #getChunk(int, int)} if
+     * they are ever requested again.
+     */
+    public void releaseChunks() {
+        Arrays.fill(this.chunks, null);
     }
 
     @Override

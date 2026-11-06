@@ -76,6 +76,8 @@ public class RegionScanTask implements Runnable {
         this.renderers.clear();
     }
 
+    private Region region;
+
     @Override
     public void run() {
         try {
@@ -87,13 +89,24 @@ public class RegionScanTask implements Runnable {
 
             Pl3xMap.api().getRegionProcessor().checkPaused();
 
-            scanRegion(loadRegion());
+            scanRegion(this.region = loadRegion());
 
             Pl3xMap.api().getRegionProcessor().checkPaused();
 
             saveImages();
         } catch (Throwable t) {
             Logger.severe("Failed to scan world %s at region %s".formatted(world.getName(), regionPos), t);
+        } finally {
+            // free the parsed chunks and rendered images of this region as soon as
+            // the task is done. the task itself stays referenced by its CompletableFuture
+            // (CompletableFuture.allOf holds them until the whole world scan finishes),
+            // so without this every scanned region would keep its 1024 parsed chunks
+            // plus a 1MB tile image per renderer alive for the rest of the scan.
+            if (this.region != null) {
+                this.region.releaseChunks();
+                this.region = null;
+            }
+            cleanup();
         }
     }
 
