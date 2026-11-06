@@ -297,7 +297,9 @@ public class Colors {
             return lerpRGB(0x007C00, 0xDCBB65, (Math.max(blockstate.getAge(), 0) + 1) / 8F);
         }
         if (key.equals("minecraft:redstone_wire")) {
-            return Pl3xMap.api().getColorForPower(blockstate.getPower());
+            // block state data may be missing the power property, which defaults to -1
+            int power = Math.max(0, Math.min(15, blockstate.getPower()));
+            return Pl3xMap.api().getColorForPower((byte) power);
         }
         if (key.equals("minecraft:cocoa")) {
             return switch (Math.max(blockstate.getAge(), 0)) {
